@@ -74,7 +74,8 @@ custom_rules:
     # matched here. PlexHomeViewController is a grandfathered leftover import.
     regex: '\bimport\s+SwiftUI\b'
     match_kinds: [keyword, identifier, typeidentifier]
-    included: 'Rivulet/Views/(Media/(UIKit|Library/UIKit|MediaDetail/UIKit|Person/UIKit|PlexHome/UIKit|PreviewCarousel/UIKit)|Player/UIKit)/[^/]+\.swift$'
+    # `/.*\.swift$` (not `/[^/]+`) so nested subdirs (e.g. .../UIKit/Cells/) are covered too.
+    included: 'Rivulet/Views/(Media/(UIKit|Library/UIKit|MediaDetail/UIKit|Person/UIKit|PlexHome/UIKit|PreviewCarousel/UIKit)|Player/UIKit)/.*\.swift$'
     excluded: '.*PlexHomeViewController\.swift$'
     message: "UIKit is the default on this surface — do not add SwiftUI (see CLAUDE.md)."
     severity: error
