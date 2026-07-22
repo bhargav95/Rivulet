@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2025-2026 Bain Gurley
 
-import XCTest
+import Testing
+import Foundation
 @testable import Rivulet
 
-final class EpisodePickerTests: XCTestCase {
+@Suite("EpisodePicker")
+struct EpisodePickerTests {
 
-    // MARK: - Builders
+    // MARK: - Builder
 
-    private func episode(
+    // Static so it can build both `@Test` bodies and `arguments:` collections
+    // (argument arrays are evaluated in a type-level context).
+    private static func episode(
         _ id: String,
         season: Int? = 1,
         number: Int?,
@@ -39,107 +43,108 @@ final class EpisodePickerTests: XCTestCase {
 
     // MARK: - firstUnplayed
 
-    func testEmptySeasonReturnsNil() {
-        XCTAssertNil(EpisodePicker.firstUnplayed(in: []))
+    struct FirstUnplayedCase: Sendable, CustomTestStringConvertible {
+        let name: String
+        let episodes: [MediaItem]
+        let expectedID: String?
+        var testDescription: String { name }
     }
 
-    func testFreshSeasonStartsAtEpisodeOne() {
-        let eps = [episode("e1", number: 1), episode("e2", number: 2)]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e1")
-    }
+    static let firstUnplayedCases: [FirstUnplayedCase] = [
+        .init(name: "empty season returns nil", episodes: [], expectedID: nil),
+        .init(name: "fresh season starts at episode one",
+              episodes: [episode("e1", number: 1), episode("e2", number: 2)],
+              expectedID: "e1"),
+        .init(name: "skips watched episodes to first unplayed",
+              episodes: [
+                episode("e1", number: 1, played: true),
+                episode("e2", number: 2, played: true),
+                episode("e3", number: 3),
+                episode("e4", number: 4),
+              ],
+              expectedID: "e3"),
+        .init(name: "in-progress episode wins over later unplayed",
+              episodes: [
+                episode("e1", number: 1, played: true),
+                episode("e2", number: 2, offset: 300),
+                episode("e3", number: 3),
+              ],
+              expectedID: "e2"),
+        .init(name: "fully watched season restarts at episode one",
+              episodes: [
+                episode("e1", number: 1, played: true),
+                episode("e2", number: 2, played: true),
+              ],
+              expectedID: "e1"),
+        .init(name: "played episode with resume offset is not in-progress",
+              episodes: [
+                episode("e1", number: 1, played: true, offset: 120),
+                episode("e2", number: 2),
+              ],
+              expectedID: "e2"),
+        .init(name: "unordered input is sorted before picking",
+              episodes: [
+                episode("e3", number: 3),
+                episode("e1", number: 1, played: true),
+                episode("e2", number: 2),
+              ],
+              expectedID: "e2"),
+        .init(name: "sorts across seasons before episodes",
+              episodes: [
+                episode("s2e1", season: 2, number: 1),
+                episode("s1e2", season: 1, number: 2),
+                episode("s1e1", season: 1, number: 1, played: true),
+              ],
+              expectedID: "s1e2"),
+        .init(name: "missing episode numbers fall back to server order",
+              episodes: [
+                episode("first", season: nil, number: nil, played: true),
+                episode("second", season: nil, number: nil),
+              ],
+              expectedID: "second"),
+    ]
 
-    func testSkipsWatchedEpisodesToFirstUnplayed() {
-        let eps = [
-            episode("e1", number: 1, played: true),
-            episode("e2", number: 2, played: true),
-            episode("e3", number: 3),
-            episode("e4", number: 4),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e3")
-    }
-
-    func testInProgressEpisodeWinsOverLaterUnplayed() {
-        // e1 watched, e2 started but unfinished, e3 untouched → resume e2.
-        let eps = [
-            episode("e1", number: 1, played: true),
-            episode("e2", number: 2, offset: 300),
-            episode("e3", number: 3),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e2")
-    }
-
-    func testFullyWatchedSeasonRestartsAtEpisodeOne() {
-        let eps = [
-            episode("e1", number: 1, played: true),
-            episode("e2", number: 2, played: true),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e1")
-    }
-
-    func testPlayedEpisodeWithResumeOffsetIsNotTreatedAsInProgress() {
-        // A rewatch leaves viewCount > 0 AND a viewOffset. The next NEW episode
-        // should still win over resuming a finished one.
-        let eps = [
-            episode("e1", number: 1, played: true, offset: 120),
-            episode("e2", number: 2),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e2")
-    }
-
-    func testUnorderedInputIsSortedBeforePicking() {
-        let eps = [
-            episode("e3", number: 3),
-            episode("e1", number: 1, played: true),
-            episode("e2", number: 2),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "e2")
-    }
-
-    func testSortsAcrossSeasonsBeforeEpisodes() {
-        let eps = [
-            episode("s2e1", season: 2, number: 1),
-            episode("s1e2", season: 1, number: 2),
-            episode("s1e1", season: 1, number: 1, played: true),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "s1e2")
-    }
-
-    func testMissingEpisodeNumbersFallBackToServerOrder() {
-        let eps = [
-            episode("first", season: nil, number: nil, played: true),
-            episode("second", season: nil, number: nil),
-        ]
-        XCTAssertEqual(EpisodePicker.firstUnplayed(in: eps)?.ref.itemID, "second")
+    @Test("firstUnplayed picks the correct episode", arguments: firstUnplayedCases)
+    func firstUnplayed(_ scenario: FirstUnplayedCase) {
+        #expect(EpisodePicker.firstUnplayed(in: scenario.episodes)?.ref.itemID == scenario.expectedID)
     }
 
     // MARK: - nextUpLabel
 
-    func testNextUpLabelFormat() {
-        let ep = episode("e3", season: 1, number: 3)
-        XCTAssertEqual(EpisodePicker.nextUpLabel(for: ep), "Next Up: S1E3 · Episode 3")
+    struct LabelCase: Sendable, CustomTestStringConvertible {
+        let name: String
+        let episode: MediaItem
+        let expected: String?
+        var testDescription: String { name }
     }
 
-    func testResumeLabelWhenInProgress() {
-        let ep = episode("e3", season: 2, number: 5, offset: 300)
-        XCTAssertEqual(EpisodePicker.nextUpLabel(for: ep), "Resume: S2E5 · Episode 5")
-    }
+    static let labelCases: [LabelCase] = [
+        .init(name: "next-up format",
+              episode: episode("e3", season: 1, number: 3),
+              expected: "Next Up: S1E3 · Episode 3"),
+        .init(name: "resume label when in progress",
+              episode: episode("e3", season: 2, number: 5, offset: 300),
+              expected: "Resume: S2E5 · Episode 5"),
+        .init(name: "nil without numbering",
+              episode: episode("e1", season: nil, number: nil),
+              expected: nil),
+    ]
 
-    func testNextUpLabelNilWithoutNumbering() {
-        let ep = episode("e1", season: nil, number: nil)
-        XCTAssertNil(EpisodePicker.nextUpLabel(for: ep))
+    @Test("nextUpLabel formats correctly", arguments: labelCases)
+    func nextUpLabel(_ scenario: LabelCase) {
+        #expect(EpisodePicker.nextUpLabel(for: scenario.episode) == scenario.expected)
     }
 
     // MARK: - isInProgress
 
-    func testIsInProgressSemantics() {
-        let untouched = MediaUserState(isPlayed: false, viewOffset: 0, isFavorite: false, lastViewedAt: nil)
-        let started = MediaUserState(isPlayed: false, viewOffset: 60, isFavorite: false, lastViewedAt: nil)
-        let finished = MediaUserState(isPlayed: true, viewOffset: 0, isFavorite: false, lastViewedAt: nil)
-        let rewatching = MediaUserState(isPlayed: true, viewOffset: 60, isFavorite: false, lastViewedAt: nil)
-
-        XCTAssertFalse(untouched.isInProgress)
-        XCTAssertTrue(started.isInProgress)
-        XCTAssertFalse(finished.isInProgress)
-        XCTAssertFalse(rewatching.isInProgress)
+    @Test("isInProgress semantics",
+          arguments: [
+            (MediaUserState(isPlayed: false, viewOffset: 0, isFavorite: false, lastViewedAt: nil), false),
+            (MediaUserState(isPlayed: false, viewOffset: 60, isFavorite: false, lastViewedAt: nil), true),
+            (MediaUserState(isPlayed: true, viewOffset: 0, isFavorite: false, lastViewedAt: nil), false),
+            (MediaUserState(isPlayed: true, viewOffset: 60, isFavorite: false, lastViewedAt: nil), false),
+          ])
+    func isInProgress(_ state: MediaUserState, _ expected: Bool) {
+        #expect(state.isInProgress == expected)
     }
 }

@@ -1,0 +1,35 @@
+{
+  "configurations" : [
+    {
+      "id" : "FB799B68-33C0-450D-AABA-BA78A6DAB8BF",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : {
+      "targets" : [
+        {
+          "containerPath" : "container:Rivulet.xcodeproj",
+          "identifier" : "A72E03D92EDA297D003A73DA",
+          "name" : "Rivulet"
+        }
+      ]
+    },
+    "testExecutionOrdering" : "random",
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Rivulet.xcodeproj",
+        "identifier" : "A78483092F062C2000F9E6D0",
+        "name" : "RivuletTests"
+      }
+    }
+  ],
+  "version" : 1
+}
