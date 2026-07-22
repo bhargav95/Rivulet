@@ -1,0 +1,14 @@
+# Keeps GitHub Actions and any workflow container images current.
+# The Swift/SPM ecosystem is intentionally NOT tracked: AetherEngine is
+# exactVersion-pinned by policy and bumped manually via the aether-update
+# skill (see CLAUDE.md), so an automated PR would fight that process.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    labels:
+      - dependencies

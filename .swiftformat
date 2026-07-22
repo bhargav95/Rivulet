@@ -1,0 +1,55 @@
+# SwiftFormat configuration for Rivulet.
+#
+# Philosophy: tuned to the code that already exists, not to SwiftFormat's
+# defaults. Running the defaults rewrites 344/380 files because they fight the
+# repo's established style (heavy explicit `self`, unsorted imports, one-line
+# bodies, mixed trailing commas). This config keeps the rules that are genuine
+# cleanups (indentation, redundant returns, dead code) and DISABLES the rules
+# that would only churn the tree to impose a different-but-equal style.
+#
+# Options below were derived from `swiftformat --inferoptions Rivulet` so the
+# formatter agrees with the code instead of reformatting it. SwiftFormat owns
+# formatting; SwiftLint (see .swiftlint.yml) owns correctness — the two do not
+# overlap. Enforced locally via pre-commit on changed files, so the residual
+# normalizes incrementally as files are touched rather than in one mega-diff.
+#
+# Residual first-run churn with this config: 122 files (vs 344 on defaults).
+# Re-measure after any change:  swiftformat . --lint
+
+--swiftversion 6.0
+
+# --- Style options matched to the existing tree (from --inferoptions) ---
+--indent 4
+--ifdef no-indent               # bodies of #if are not extra-indented here
+--pattern-let inline            # `if case let .x(y)` not `if case .x(let y)`
+--strip-unused-args closure-only
+--no-space-operators ...,..<    # `0...9`, `0..<9` written tight in this repo
+
+# --- Rules disabled because they impose a different style, not a fix ---
+# Each of these rewrites 40-160 files with no correctness gain.
+--disable redundantSelf         # the repo writes explicit self deliberately
+--disable sortImports           # import order is left to the author
+--disable consecutiveSpaces     # would collapse intentional alignment
+--disable blankLinesAtStartOfScope, blankLinesBetweenScopes, blankLinesAroundMark
+--disable unusedArguments        # renaming to _ hurts protocol-method readability
+--disable andOperator            # `&&` is clearer than a comma in this codebase
+--disable docComments            # do not force // comments into /// doc comments
+--disable conditionalAssignment  # leave if/switch-expression assignment to the author
+--disable initCoderUnavailable   # UIKit views here manage required init(coder:) by hand
+--disable preferKeyPath          # `map { $0.x }` is fine; not worth the churn
+--disable trailingCommas         # the tree is mixed; enforcing either way is pure churn
+
+# Body/brace wrapping: the repo uses one-line bodies (`if x { return }`); the
+# default wrap-body rules would explode those across the whole tree.
+--disable wrapMultilineStatementBraces, wrapArguments
+--disable wrapIfStatementBodies, wrapFunctionBodies, wrapPropertyBodies, wrapLoopBodies
+
+# Test-hygiene rules that make SEMANTIC edits (foo! -> try XCTUnwrap(foo),
+# adding `throws`). A formatter should not rewrite test logic.
+--disable noForceUnwrapInTests, noForceTryInTests
+
+# redundantOptionalBinding (`if let x = x` -> `if let x`) is a fine modernization
+# but touches 27 files; skip it to keep the first-run diff small.
+--disable redundantOptionalBinding
+
+--exclude Rivulet/OpenSourceLicenses.swift, Rivulet/Config/Secrets.swift, node_modules, .wrangler, DerivedData, .build, RivuletTests/Fixtures

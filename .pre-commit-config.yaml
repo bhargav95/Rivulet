@@ -29,6 +29,14 @@ repos:
 
   - repo: local
     hooks:
+      # Format first so lint sees the formatted result. swiftformat rewrites the
+      # staged files in place; pre-commit then reports them as modified and the
+      # commit re-runs after `git add`. Config: .swiftformat.
+      - id: swiftformat
+        name: SwiftFormat
+        entry: swiftformat
+        language: system
+        types: [swift]
       - id: swiftlint
         name: SwiftLint
         entry: swiftlint lint --strict --quiet

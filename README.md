@@ -135,17 +135,23 @@ brew install swiftlint swiftformat pre-commit
 pre-commit install          # installs the git hook
 ```
 
-Now every commit runs SwiftFormat and SwiftLint on changed Swift files. To lint the whole project manually:
+Now every commit runs SwiftFormat then SwiftLint on changed Swift files. To run them across the whole project manually:
 
 ```bash
+swiftformat .              # applies the .swiftformat rules
+swiftformat . --lint       # report only, no changes
 swiftlint lint             # config + baseline are picked up automatically
 ```
 
-Rules are tuned in `.swiftlint.yml` to catch real bugs (force casts, force tries, etc.) without style noise. Pre-existing violations are grandfathered in `.swiftlint-baseline.json`, so only **new** violations fail — the same check the `SwiftLint` GitHub Action runs on every PR. If you deliberately clean up existing violations, regenerate the baseline so the counts shrink:
+`.swiftformat` is **tuned to the existing code**, not to SwiftFormat's defaults — it keeps genuine cleanups (indentation, redundant returns, dead code) and disables the rules that would only restyle the tree (explicit `self`, import order, one-line-body wrapping). See the header comment in the file for the reasoning.
+
+Rules are tuned in `.swiftlint.yml` to catch real bugs (force casts, force tries, etc.) without style noise, plus a few **custom rules** that encode project invariants (no UIKit context menus on tvOS 26, no SwiftUI in the UIKit primary surfaces, no `AVPlayerLayer` on `currentAVPlayer`). Pre-existing violations are grandfathered in `.swiftlint-baseline.json`, so only **new** violations fail — the same check the `SwiftLint` GitHub Action runs on every PR. If you deliberately clean up existing violations, regenerate the baseline so the counts shrink:
 
 ```bash
 swiftlint lint --write-baseline .swiftlint-baseline.json
 ```
+
+The non-Swift hooks (gitleaks secret scan, shellcheck, YAML/JSON checks) also run in CI via the `pre-commit` GitHub Action, so they are enforced on every PR whether or not you ran `pre-commit install` locally.
 
 By submitting a pull request, you agree to license your contribution under the same terms as Rivulet (PolyForm Noncommercial 1.0.0, see [LICENSE](LICENSE)).
 

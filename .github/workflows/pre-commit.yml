@@ -1,0 +1,30 @@
+name: pre-commit
+
+# Enforces the Linux-runnable pre-commit hooks on every PR and push to main, so
+# the secret scan (gitleaks), shellcheck, and file checks are gated in CI — not
+# just for devs who ran `pre-commit install`. The Swift hooks (swiftlint,
+# swiftformat) need a macOS/Swift toolchain and are covered elsewhere
+# (swiftlint.yml, and the build-test job), so they are SKIPped here.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pre-commit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    env:
+      # Skip the hooks that require a Swift toolchain; they run on macOS jobs.
+      SKIP: swiftlint,swiftformat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files

@@ -51,3 +51,39 @@ disabled_rules:
 #   force_cast, force_try, non_optional_string_data_conversion, for_where,
 #   unused_closure_parameter, unused_optional_binding, redundant_string_enum_value,
 #   void_function_in_ternary, control_statement, unneeded_override, inclusive_language, …
+
+# Custom rules encode CLAUDE.md invariants that were previously reviewer-memory
+# only. `match_kinds` restricts matches to real code tokens so the rules never
+# fire on the comments that document these very invariants. Verified zero hits
+# on the current tree (custom rules are NOT covered by the baseline).
+custom_rules:
+  no_uikit_context_menu:
+    name: "No UIContextMenuInteraction on tvOS"
+    # tvOS 26 never asks a UIKit context-menu interaction for its configuration
+    # (verified, see TileMenuPopupViewController). The canonical menu is the
+    # hand-built TileMenuPopupViewController fed by a UILongPressGestureRecognizer.
+    regex: '\b(UIContextMenuInteraction|contextMenuConfigurationForItemsAt)\b'
+    match_kinds: [identifier, typeidentifier]
+    message: "UIKit context menus are dead on tvOS 26 — use TileMenuPopupViewController (see CLAUDE.md)."
+    severity: error
+
+  no_swiftui_in_uikit_surface:
+    name: "No SwiftUI in UIKit primary surfaces"
+    # Home/Detail/Library/Person/PreviewCarousel/player-chrome are UIKit by
+    # default (CLAUDE.md). Settings/Music/nav shells stay SwiftUI and are not
+    # matched here. PlexHomeViewController is a grandfathered leftover import.
+    regex: '\bimport\s+SwiftUI\b'
+    match_kinds: [keyword, identifier, typeidentifier]
+    included: 'Rivulet/Views/(Media/(UIKit|Library/UIKit|MediaDetail/UIKit|Person/UIKit|PlexHome/UIKit|PreviewCarousel/UIKit)|Player/UIKit)/[^/]+\.swift$'
+    excluded: '.*PlexHomeViewController\.swift$'
+    message: "UIKit is the default on this surface — do not add SwiftUI (see CLAUDE.md)."
+    severity: error
+
+  no_avplayerlayer_on_current_avplayer:
+    name: "No AVPlayerLayer on currentAVPlayer"
+    # Video renders through the engine surface (AetherVideoSurfaceView →
+    # engine.bind(view:)), never a raw AVPlayerLayer bound to currentAVPlayer.
+    # Conservative: only the AVPlayerLayer(...currentAVPlayer...) construction.
+    regex: 'AVPlayerLayer\([^)\n]*currentAVPlayer'
+    message: "Render video through the engine surface, not an AVPlayerLayer on currentAVPlayer (see CLAUDE.md / RIVULET_PLAYER.md)."
+    severity: error
