@@ -558,7 +558,7 @@ enum SettingsContent {
             })))
             rows.append(SettingsRowItem(id: "signOut", title: "Sign Out",
                                         kind: .action(destructive: true, handler: { vc in
-                // Asks first: one stray Select would otherwise sign out.
+                // Ask first. An accidental Select must not sign out.
                 presentConfirm(on: vc, title: "Sign Out of Plex?",
                                message: "You can sign in again from this page.",
                                confirmTitle: "Sign Out", destructive: true) {
@@ -584,15 +584,16 @@ enum SettingsContent {
 
     // MARK: Plex server picker
 
-    /// The account's servers, fetched each time the picker opens. nil while loading.
+    /// The servers on the account. The page loads them each time it opens.
+    /// The value is nil until they arrive.
     private static var plexServers: [PlexDevice]?
     private static var plexServersFailed = false
-    /// The server a switch is connecting to. Other taps are ignored until it settles.
+    /// The server of the current switch. The page ignores other selections until the switch completes.
     private static var connectingPlexServerID: String?
 
     private static var plexServerPicker: [SettingsRowItem] {
-        // Focusable on purpose: the container only places focus on push, so a
-        // page with nothing focusable would strand it when the servers arrive.
+        // This row can get focus. The container sets focus only on push.
+        // If no row can get focus, focus is lost when the servers arrive.
         guard let servers = plexServers, !servers.isEmpty else {
             if plexServersFailed || plexServers != nil {
                 return [SettingsRowItem(id: "plexServersRetry",

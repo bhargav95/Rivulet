@@ -53,7 +53,7 @@ extension IOSPlexSession {
         PlexAuthManager.shared.isCurrentServer(server)
     }
 
-    /// Switches servers. Returns false when no connection to it worked; the old server stays in use.
+    /// Switches servers. If the app cannot connect, this returns false and the old server stays in use.
     func switchServer(to server: PlexDevice) async -> Bool {
         guard await PlexAuthManager.shared.selectServer(server) else { return false }
         contentSessionChanged()

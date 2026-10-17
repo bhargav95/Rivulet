@@ -601,14 +601,14 @@ class PlexDataStore: ObservableObject {
 
     // MARK: - Server Switching
 
-    /// Moves the app onto another server on the account (Settings → Plex Server).
-    /// Returns false when no connection to it worked; the current server stays in use.
+    /// Moves the app to a different server on the account.
+    /// If the app cannot connect, this returns false and the current server stays in use.
     func switchServer(to server: PlexDevice) async -> Bool {
         guard await authManager.selectServer(server) else { return false }
-        // The queue reports progress to the server it was started on.
+        // The music queue sends progress to the server that started it.
         MusicQueue.shared.stop()
         MusicQueue.shared.clear()
-        // Every cache a profile switch drops is per server too.
+        // The profile switch clears all caches that are specific to a server.
         await onProfileSwitched()
         return true
     }

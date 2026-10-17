@@ -5,9 +5,8 @@
 //  PlexServerSwitchTests.swift
 //  RivuletTests
 //
-//  Settings → Plex Server → Server switches to another server on the account.
-//  The shared rules: which server counts as current, and that a switch that
-//  cannot connect leaves the current server in use and reported as reachable.
+//  Tests for the server switch in Settings → Plex Server → Server.
+//  A failed switch must keep the current server. The app must not mark that server as unreachable.
 //
 
 import XCTest
@@ -52,10 +51,10 @@ final class PlexServerSwitchTests: XCTestCase {
         let shared = try device("bbb", name: "Home")
         auth.selectedServer = home
         XCTAssertTrue(auth.isCurrentServer(home))
-        XCTAssertFalse(auth.isCurrentServer(shared), "a same-named server is not the current one")
+        XCTAssertFalse(auth.isCurrentServer(shared), "a server with the same name is not the current server")
     }
 
-    /// `selectedServer` is not persisted, so after relaunch only the saved URL says which one is in use.
+    /// After a relaunch, `selectedServer` is nil. Only the saved URL identifies the current server.
     func test_isCurrentServer_afterRelaunch_matchesSavedURL() throws {
         let home = try device("aaa", name: "Home", uri: "http://192.168.0.5:32400")
         let friend = try device("bbb", name: "Friend", uri: "http://10.0.0.9:32400")
@@ -67,7 +66,7 @@ final class PlexServerSwitchTests: XCTestCase {
 
     // MARK: Failed switch
 
-    /// No connection candidates, so the probe fails without touching the network.
+    /// The server has no connections, so the probe fails without network access.
     func test_failedSwitch_keepsCurrentServerReachable() async throws {
         let current = try device("aaa", name: "Home", uri: "http://192.168.0.5:32400")
         auth.selectedServer = current
@@ -81,12 +80,12 @@ final class PlexServerSwitchTests: XCTestCase {
         XCTAssertFalse(switched)
         XCTAssertEqual(auth.selectedServer?.clientIdentifier, "aaa")
         XCTAssertEqual(auth.selectedServerURL, "http://192.168.0.5:32400")
-        XCTAssertTrue(auth.isConnected, "the current server was never retested, so it is not offline")
+        XCTAssertTrue(auth.isConnected, "the app did not test the current server again, so it is not offline")
         XCTAssertNil(auth.connectionError)
         XCTAssertEqual(auth.state, .authenticated)
     }
 
-    /// Sign-in with no server chosen yet still reports the failure.
+    /// During sign-in, no server is selected yet. A failure must show an error.
     func test_failedFirstSelection_reportsError() async throws {
         auth.selectedServer = nil
         auth.selectedServerURL = nil

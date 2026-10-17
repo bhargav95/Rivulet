@@ -276,8 +276,8 @@ class PlexAuthManager: ObservableObject {
 
                 return true
             } else if selectedServerURL != nil {
-                // A failed switch: the current server is still selected and was
-                // never retested, so it must not be reported as unreachable.
+                // The switch failed. The current server stays selected.
+                // The app did not test it again, so do not mark it as unreachable.
                 return false
             } else {
                 isConnected = false
@@ -871,7 +871,8 @@ class PlexAuthManager: ObservableObject {
         userDefaults.string(forKey: serverNameKey)
     }
 
-    /// Whether `server` is the one in use. `selectedServer` is unset after relaunch, so fall back to URL and name.
+    /// Returns true if the app uses `server` now.
+    /// After a relaunch, `selectedServer` is nil, so this also compares the saved URL and name.
     func isCurrentServer(_ server: PlexDevice) -> Bool {
         if let current = selectedServer { return current.clientIdentifier == server.clientIdentifier }
         if let url = selectedServerURL, urlBelongs(url, to: server) { return true }
