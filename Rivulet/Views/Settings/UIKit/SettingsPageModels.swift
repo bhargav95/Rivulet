@@ -176,6 +176,7 @@ enum SettingsContent {
         case .music:       return music
         case .servers:     return servers
         case .plex:        return plex
+        case .plexServerPicker: return plexServerPicker
         case .jellyfin:    return jellyfin
         case .libraries:   return libraries
         case .homeRows:    return homeRows
@@ -551,14 +552,13 @@ enum SettingsContent {
         let auth = PlexAuthManager.shared
         if auth.isAuthenticated {
             var rows: [SettingsRowItem] = []
-            if let name = auth.savedServerName {
-                rows.append(SettingsRowItem(id: "plexServerInfo", title: "Server",
-                                            kind: .info(value: { name })))
-            }
+            rows.append(SettingsRowItem(id: "plexServerPicker", title: "Server",
+                                        kind: .navigationValue(.plexServerPicker, value: {
+                PlexAuthManager.shared.savedServerName ?? ""
+            })))
             rows.append(SettingsRowItem(id: "signOut", title: "Sign Out",
                                         kind: .action(destructive: true, handler: { vc in
-                // Asks first: it is the page's only focus target, so one stray
-                // Select on arrival would otherwise sign out.
+                // Asks first: one stray Select would otherwise sign out.
                 presentConfirm(on: vc, title: "Sign Out of Plex?",
                                message: "You can sign in again from this page.",
                                confirmTitle: "Sign Out", destructive: true) {
@@ -579,6 +579,72 @@ enum SettingsContent {
                     presenter.present(auth, animated: true)
                 }))
             ]
+        }
+    }
+
+    // MARK: Plex server picker
+
+    /// The account's servers, fetched each time the picker opens. nil while loading.
+    private static var plexServers: [PlexDevice]?
+    private static var plexServersFailed = false
+    /// The server a switch is connecting to. Other taps are ignored until it settles.
+    private static var connectingPlexServerID: String?
+
+    private static var plexServerPicker: [SettingsRowItem] {
+        // Focusable on purpose: the container only places focus on push, so a
+        // page with nothing focusable would strand it when the servers arrive.
+        guard let servers = plexServers, !servers.isEmpty else {
+            if plexServersFailed || plexServers != nil {
+                return [SettingsRowItem(id: "plexServersRetry",
+                                        title: plexServersFailed ? "Couldn’t Load Servers" : "No Servers Found",
+                                        kind: .action(destructive: false, handler: { vc in
+                    loadPlexServers { [weak vc] in (vc as? SettingsPageViewController)?.reloadRows() }
+                }))]
+            }
+            return [SettingsRowItem(id: "plexServersLoading", title: "Loading Servers…",
+                                    kind: .action(destructive: false, handler: { _ in }))]
+        }
+        return servers.map { server in
+            SettingsRowItem(id: "plexServer_\(server.clientIdentifier)", title: server.name, kind: .selectable(
+                isSelected: { connectingPlexServerID == nil && PlexAuthManager.shared.isCurrentServer(server) },
+                value: {
+                    if connectingPlexServerID == server.clientIdentifier { return "Connecting…" }
+                    return server.owned == false ? server.sourceTitle : nil
+                },
+                handler: { vc in switchPlexServer(to: server, on: vc) }))
+        }
+    }
+
+    private static func loadPlexServers(reload: @escaping () -> Void) {
+        plexServers = nil
+        plexServersFailed = false
+        reload()
+        Task { @MainActor in
+            if let token = PlexAuthManager.shared.authToken,
+               let servers = try? await PlexNetworkManager.shared.getServers(authToken: token) {
+                plexServers = servers
+            } else {
+                plexServersFailed = true
+            }
+            reload()
+        }
+    }
+
+    private static func switchPlexServer(to server: PlexDevice, on vc: UIViewController) {
+        guard connectingPlexServerID == nil, !PlexAuthManager.shared.isCurrentServer(server) else { return }
+        let current = PlexAuthManager.shared.savedServerName ?? "your current server"
+        connectingPlexServerID = server.clientIdentifier
+        (vc as? SettingsPageViewController)?.reloadRows()
+        Task { @MainActor [weak vc] in
+            let switched = await PlexDataStore.shared.switchServer(to: server)
+            connectingPlexServerID = nil
+            guard let page = vc as? SettingsPageViewController else { return }
+            page.reloadRows()
+            guard !switched else { return }
+            page.present(ConfirmationPopupViewController(
+                title: "Couldn’t Connect",
+                message: "\(server.name) isn’t reachable right now. Rivulet is still using \(current).",
+                confirmTitle: "OK", cancelTitle: nil, onConfirm: {}), animated: true)
         }
     }
 
@@ -893,6 +959,8 @@ enum SettingsContent {
             // failure text must not survive leaving the flow.
             resetAddSourceFlow()
             reload()
+        case .plexServerPicker:
+            loadPlexServers(reload: reload)
         case .liveTVFavorites where LiveTVDataStore.shared.channels.isEmpty:
             // Settings can open before Live TV has loaded its channels.
             Task { @MainActor in
